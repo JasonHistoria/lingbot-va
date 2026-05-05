@@ -53,14 +53,18 @@ fi
 
 conda activate "$ENV_NAME"
 
+# GPFS + cluster network is flaky for large wheels — give pip generous
+# retry/timeout for every install below.
+PIP_NET_OPTS="--timeout 300 --retries 10"
+
 # ── 2. Install pinned deps from lingbot-va README ────────────────────────────
 echo "[setup] installing torch 2.9.0 + cu126"
-pip install --upgrade pip
-pip install --quiet torch==2.9.0 torchvision==0.24.0 torchaudio==2.9.0 \
+pip install --upgrade pip $PIP_NET_OPTS
+pip install $PIP_NET_OPTS torch==2.9.0 torchvision==0.24.0 torchaudio==2.9.0 \
     --index-url https://download.pytorch.org/whl/cu126
 
 echo "[setup] installing lingbot-va runtime deps"
-pip install --quiet \
+pip install $PIP_NET_OPTS \
     websockets einops diffusers==0.36.0 transformers==4.55.2 accelerate \
     msgpack opencv-python matplotlib ftfy easydict \
     huggingface_hub
@@ -86,7 +90,7 @@ fi
 
 # Required for the eval client to read LeRobot helpers + write_json
 echo "[setup] installing lerobot==0.3.3 + scipy (no-deps; lerobot pulls heavy stuff otherwise)"
-pip install --quiet lerobot==0.3.3 scipy --no-deps
+pip install $PIP_NET_OPTS lerobot==0.3.3 scipy --no-deps
 
 # ── 3. LIBERO-plus (sim) deps ────────────────────────────────────────────────
 # LIBERO-plus's setup.py installs robosuite/mujoco/etc. We don't `pip install
@@ -94,7 +98,7 @@ pip install --quiet lerobot==0.3.3 scipy --no-deps
 # need its third-party requirements.
 if [[ -f "$LIBERO_PLUS_ROOT/requirements.txt" ]]; then
   echo "[setup] installing LIBERO-plus requirements"
-  pip install --quiet -r "$LIBERO_PLUS_ROOT/requirements.txt" || {
+  pip install $PIP_NET_OPTS -r "$LIBERO_PLUS_ROOT/requirements.txt" || {
     echo "[setup] WARN: some LIBERO-plus deps failed; you may need to fix manually"
   }
 else
