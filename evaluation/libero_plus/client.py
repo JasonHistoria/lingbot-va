@@ -188,7 +188,16 @@ def run_one_task(model, task, init_state, prompt, max_timesteps, save_video_path
         start_idx = 1 if first else 0
         for i in range(start_idx, action.shape[1]):
             for j in range(action.shape[2]):
-                ee_action = action[:, i, j]
+                ee_action = action[:, i, j].copy()
+                # Gripper convention fix:
+                #   1. Sign flip: lingbot-va's LIBERO LeRobot training data has gripper
+                #      sign reversed from LIBERO Panda env (training: +=open/-=close,
+                #      env: +=close/-=open). Empirically verified by trying all 4 combos.
+                #   2. Threshold to ±1: flow-matching diffusion output is soft (~±0.3-0.5)
+                #      which only triggers partial close/open in LIBERO; we threshold
+                #      to extremes for full grip/release. Without this gripper holds
+                #      too weakly to lift objects.
+                ee_action[6] = -1.0 if ee_action[6] > 0 else 1.0
                 observes, done = env_one_step(env, ee_action)
                 if done:
                     break
