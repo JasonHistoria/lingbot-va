@@ -96,7 +96,7 @@ export OUTPUT_DIR
 export PROMPT_SOURCE=libero_plus_smart
 export SAVE_VIDEOS=0
 export BASE_PORT=29056
-export SERVER_WARMUP_SEC=120  # 14B params + VAE + T5 takes a while
+export SERVER_WARMUP_SEC=240  # 14B + VAE + T5 × 2 GPU; smoke needed 180
 
 bash evaluation/libero_plus/run_libero_plus_batch.sh
 
