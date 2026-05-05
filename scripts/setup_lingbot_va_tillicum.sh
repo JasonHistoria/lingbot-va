@@ -18,12 +18,29 @@
 
 set -euo pipefail
 
-MINIFORGE_ROOT="${MINIFORGE_ROOT:-/gpfs/home/jliu63/projects/miniforge3}"
+# Auto-detect miniforge root from the conda already on PATH (so we don't
+# hard-code a path that drifts from the user's actual install). Override
+# via MINIFORGE_ROOT env var if needed.
+if [[ -z "${MINIFORGE_ROOT:-}" ]]; then
+  CONDA_BIN="$(command -v conda || true)"
+  if [[ -z "$CONDA_BIN" ]]; then
+    echo "ERROR: no conda on PATH and MINIFORGE_ROOT not set" >&2
+    exit 1
+  fi
+  # conda lives at $ROOT/bin/conda or $ROOT/condabin/conda; both yield $ROOT
+  # via two dirname's.
+  MINIFORGE_ROOT="$(dirname "$(dirname "$CONDA_BIN")")"
+  echo "[setup] auto-detected MINIFORGE_ROOT=$MINIFORGE_ROOT"
+fi
+
 ENV_NAME="${ENV_NAME:-lingbot_va_libero}"
 ACTIVATE_SCRIPT="${ACTIVATE_SCRIPT:-/gpfs/home/jliu63/activate_lingbot_va_tillicum.sh}"
 LIBERO_PLUS_ROOT="${LIBERO_PLUS_ROOT:-/gpfs/home/jliu63/projects/HVLA/third_party/LIBERO-plus}"
 
 [[ -d "$MINIFORGE_ROOT" ]] || { echo "ERROR: MINIFORGE_ROOT=$MINIFORGE_ROOT not found"; exit 1; }
+[[ -f "$MINIFORGE_ROOT/etc/profile.d/conda.sh" ]] || {
+  echo "ERROR: $MINIFORGE_ROOT/etc/profile.d/conda.sh missing — wrong MINIFORGE_ROOT?"; exit 1;
+}
 source "$MINIFORGE_ROOT/etc/profile.d/conda.sh"
 
 # ── 1. Create env if missing ─────────────────────────────────────────────────
