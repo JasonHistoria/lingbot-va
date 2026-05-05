@@ -66,11 +66,16 @@ else
   echo "[launch_server] WARN: $TRANSFORMER_CFG missing — ckpt may not be downloaded yet"
 fi
 
-echo "[launch_server] starting server on port=$PORT gpu=$GPU_ID save_root=$SAVE_ROOT"
+# Derive a torch.distributed master_port that's stable for this server (so
+# CUDA distributed init can find it) but unlikely to collide with leftover
+# TIME_WAIT sockets from previous runs. Mix PORT with $$ (current PID) so
+# back-to-back invocations get different master_ports.
+MASTER_PORT="$((20000 + (PORT * 13 + $$) % 30000))"
+echo "[launch_server] starting server on port=$PORT gpu=$GPU_ID master_port=$MASTER_PORT save_root=$SAVE_ROOT"
 CUDA_VISIBLE_DEVICES="$GPU_ID" \
   python -m torch.distributed.run \
     --nproc_per_node 1 \
-    --master_port "$((29500 + PORT % 1000))" \
+    --master_port "$MASTER_PORT" \
     wan_va/wan_va_server.py \
     --config-name libero \
     --port "$PORT" \
