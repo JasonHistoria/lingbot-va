@@ -98,9 +98,12 @@ pip install $PIP_NET_OPTS lerobot==0.3.3 scipy --no-deps
 # need its third-party requirements.
 #
 # robomimic pulls egl_probe which requires cmake to build. Tillicum's system
-# cmake isn't user-executable, so install a pip-managed cmake first.
-echo "[setup] installing pip-managed cmake (needed by egl_probe build)"
-pip install $PIP_NET_OPTS cmake
+# cmake isn't user-executable; pip's cmake 4.x wrapper breaks under pyproject
+# build isolation (its Python wrapper can't see its own module from inside the
+# isolated build env). conda-forge's cmake is a real native binary, no
+# wrapping issues.
+echo "[setup] installing conda-forge cmake (needed by egl_probe build)"
+conda install -y -c conda-forge cmake
 
 if [[ -f "$LIBERO_PLUS_ROOT/requirements.txt" ]]; then
   echo "[setup] installing LIBERO-plus requirements"
