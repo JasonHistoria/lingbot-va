@@ -127,7 +127,27 @@ else
   echo "         Either fix LIBERO_PLUS_ROOT or install LIBERO/robosuite manually."
 fi
 
-# ── 4. Write the activate script ─────────────────────────────────────────────
+# ── 4. LIBERO-plus runtime deps NOT in their requirements.txt ────────────────
+# env_wrapper.py imports `wand` (Python) which needs ImageMagick (C) at
+# runtime, plus `skimage` and `imutils` for image utilities. None of these
+# are in LIBERO-plus's requirements.txt; we install them here.
+echo "[setup] installing ImageMagick (C lib for Wand)"
+conda install -y -c conda-forge imagemagick
+
+echo "[setup] installing missing LIBERO-plus runtime deps (Wand/scikit-image/imutils)"
+pip install $PIP_NET_OPTS Wand scikit-image imutils
+
+# ── 5. Restore versions LIBERO-plus's reqs.txt downgraded ────────────────────
+# LIBERO-plus pins ancient transformers (4.21.1) and numpy (1.22.4) for their
+# own lifelong training; both break lingbot-va's diffusers 0.36 backbone:
+#   - diffusers 0.36 imports transformers.AutoImageProcessor (needs 4.30+)
+#   - cv2 4.6 / numba 0.65 are numpy-1.x ABI; scikit-image 0.25 wants numpy
+#     >=1.24; the intersection is numpy 1.24-1.x (1.26.4 is latest).
+# scikit-image install above already pulled numpy 2.x as a side effect.
+echo "[setup] restoring transformers/numpy versions for lingbot-va compatibility"
+pip install $PIP_NET_OPTS 'numpy<2' 'transformers==4.55.2' 'tokenizers>=0.21'
+
+# ── 6. Write the activate script ─────────────────────────────────────────────
 mkdir -p "$(dirname "$ACTIVATE_SCRIPT")"
 cat > "$ACTIVATE_SCRIPT" <<EOF
 #!/bin/bash
