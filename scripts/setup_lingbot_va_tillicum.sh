@@ -65,8 +65,24 @@ pip install --quiet \
     msgpack opencv-python matplotlib ftfy easydict \
     huggingface_hub
 
-echo "[setup] installing flash-attn (no-build-isolation, may take a while)"
-pip install --quiet flash-attn --no-build-isolation
+# flash-attn is OPTIONAL for inference: lingbot-va's attn_mode='torch' (SDPA)
+# path doesn't call flash_attn_func, and our launch_server.sh patches the
+# released ckpt to attn_mode=torch. wan_va/modules/model.py defers the
+# ImportError until attn_mode='flashattn' is actually selected, so a missing
+# flash-attn is fine for our LIBERO-Plus eval.
+#
+# Building flash-attn from source needs nvcc + CUDA_HOME (cluster `module
+# load cuda/12.x`), which most login nodes don't have by default. Skip by
+# default; opt in by setting INSTALL_FLASH_ATTN=1.
+if [[ "${INSTALL_FLASH_ATTN:-0}" == "1" ]]; then
+  echo "[setup] installing flash-attn (no-build-isolation, ~30 min build)"
+  pip install --quiet flash-attn --no-build-isolation || {
+    echo "[setup] WARN: flash-attn install failed — eval still works with attn_mode=torch"
+  }
+else
+  echo "[setup] SKIPPING flash-attn (set INSTALL_FLASH_ATTN=1 to enable). "
+  echo "        Inference uses attn_mode=torch (SDPA) which doesn't need it."
+fi
 
 # Required for the eval client to read LeRobot helpers + write_json
 echo "[setup] installing lerobot==0.3.3 + scipy (no-deps; lerobot pulls heavy stuff otherwise)"
