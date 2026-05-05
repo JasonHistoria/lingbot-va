@@ -97,17 +97,29 @@ pip install $PIP_NET_OPTS lerobot==0.3.3 scipy --no-deps
 # -e` the package because our slurm puts it on PYTHONPATH directly; we just
 # need its third-party requirements.
 #
-# robomimic pulls egl_probe which requires cmake to build. Tillicum's system
-# cmake isn't user-executable; pip's cmake 4.x wrapper breaks under pyproject
-# build isolation (its Python wrapper can't see its own module from inside the
-# isolated build env). conda-forge's cmake is a real native binary, no
-# wrapping issues.
-echo "[setup] installing conda-forge cmake (needed by egl_probe build)"
-conda install -y -c conda-forge cmake
+# robomimic pulls egl_probe which requires cmake to build. tillicum's system
+# cmake isn't user-executable; pip's cmake-wheel breaks under pyproject build
+# isolation; conda+pip cmake fight each other (pip uninstall removes conda's
+# binary too). The robust fix: download Kitware's official prebuilt binary
+# tarball into ~/local and put it on PATH.
+CMAKE_VERSION="3.31.5"
+CMAKE_DIR="$HOME/local/cmake-${CMAKE_VERSION}-linux-x86_64"
+if [[ ! -x "$CMAKE_DIR/bin/cmake" ]]; then
+  echo "[setup] downloading Kitware cmake ${CMAKE_VERSION} → $CMAKE_DIR"
+  mkdir -p "$HOME/local"
+  TARBALL="cmake-${CMAKE_VERSION}-linux-x86_64.tar.gz"
+  ( cd "$HOME/local" && \
+    wget -q "https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION}/${TARBALL}" && \
+    tar xf "$TARBALL" && rm "$TARBALL" )
+fi
+export PATH="$CMAKE_DIR/bin:$PATH"
+echo "[setup] cmake at: $(command -v cmake) ($(cmake --version | head -1))"
 
 if [[ -f "$LIBERO_PLUS_ROOT/requirements.txt" ]]; then
   echo "[setup] installing LIBERO-plus requirements"
-  pip install $PIP_NET_OPTS -r "$LIBERO_PLUS_ROOT/requirements.txt" || {
+  # --no-build-isolation lets egl_probe's build subprocess inherit our PATH
+  # (so it sees the kitware cmake we just unpacked).
+  pip install $PIP_NET_OPTS --no-build-isolation -r "$LIBERO_PLUS_ROOT/requirements.txt" || {
     echo "[setup] WARN: some LIBERO-plus deps failed; you may need to fix manually"
   }
 else
@@ -123,6 +135,8 @@ cat > "$ACTIVATE_SCRIPT" <<EOF
 # Source this before running lingbot-va LIBERO-Plus eval on tillicum.
 source "$MINIFORGE_ROOT/etc/profile.d/conda.sh"
 conda activate "$ENV_NAME"
+# Kitware cmake on PATH so egl_probe builds work in subshells too
+export PATH="$CMAKE_DIR/bin:\$PATH"
 EOF
 chmod +x "$ACTIVATE_SCRIPT"
 echo "[setup] wrote activate script → $ACTIVATE_SCRIPT"
