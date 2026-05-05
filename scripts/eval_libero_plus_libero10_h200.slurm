@@ -7,8 +7,11 @@
 #SBATCH --output=./logs/lvva_lp_libero10_%j.out
 #SBATCH --error=./logs/lvva_lp_libero10_%j.err
 
-# LIBERO-Plus eval (libero_10 perturbation subset, 2519 tasks) of the
-# lingbot-va-posttrain-libero-long release ckpt. 2× H200, 1 trial/task.
+# Sub-LIBERO-Plus eval (libero_10 perturbation subset, 420 tasks = 7 cats × 60)
+# of the lingbot-va-posttrain-libero-long release ckpt. 2× H200, 1 trial/task.
+# Sub task list mirrors FastWAM's generate_subeval_tasks.py output filtered
+# to libero_10 — same 60 evenly-spaced task_ids per category as FastWAM, so
+# results are directly comparable.
 #
 # Mirrors FastWAM/scripts/eval_sub_libero_plus_joint_34d_rotvec_h200.slurm
 # but runs lingbot-va's WebSocket server/client architecture instead of
@@ -49,31 +52,36 @@ fi
 
 # ── LIBERO-Plus environment (NOT vanilla LIBERO) ─────────────────────────────
 # Put LIBERO-plus first on PYTHONPATH so `from libero.libero import benchmark`
-# resolves to the perturbation suite (10030 tasks across 4 suites; we eval
-# only the libero_10 subset = 2519 tasks).
+# resolves to the perturbation suite. Server+client both inherit this PYTHONPATH.
 export PYTHONPATH="${LIBERO_PLUS_ROOT}:.:${PYTHONPATH:-}"
 rm -rf ~/.libero
-# First-time benchmark import answers a Y/N stdin prompt with "N" — same
-# trick FastWAM's slurm uses; non-zero rc here is fine.
+# First-time benchmark import answers a Y/N stdin prompt with "N" so client
+# subshells don't get hung on it. Non-zero rc here is fine.
 python -c "from libero.libero import benchmark" <<< "N" 2>&1 | tail -3 || true
 
-# ── Generate the libero_10-only task file ────────────────────────────────────
-TASK_FILE="${LINGBOT_VA_ROOT}/logs/tasks_libero_plus_libero10.txt"
+# ── Generate the sub libero_10 task file (idempotent) ────────────────────────
+# 7 categories × 60 evenly-spaced task_ids each = 420 tasks. Same 60-per-cell
+# selection as FastWAM's generate_subeval_tasks.py, filtered to libero_10.
+TASK_FILE="${LINGBOT_VA_ROOT}/logs/tasks_libero_plus_sub_libero10.txt"
 if [[ ! -f "$TASK_FILE" ]]; then
-  echo "[slurm] generating $TASK_FILE"
-  python "${FASTWAM_ROOT}/experiments/libero/generate_plus_task_file.py" \
-    --suites libero_10 \
-    --output "$TASK_FILE"
+  echo "[slurm] generating sub task list → $TASK_FILE"
+  TMP_FULL=$(mktemp)
+  python "${FASTWAM_ROOT}/experiments/libero/generate_subeval_tasks.py" \
+    --classification_path "${LIBERO_PLUS_ROOT}/libero/libero/benchmark/task_classification.json" \
+    --output_plus "$TMP_FULL" \
+    --n_per_cell 60
+  grep "^libero_10," "$TMP_FULL" > "$TASK_FILE"
+  rm -f "$TMP_FULL"
 fi
 echo "[slurm] TASK_FILE: $TASK_FILE  ($(wc -l < $TASK_FILE) tasks)"
 
 # ── Output directory: eval_results/<run_tag>_<timestamp>/ ────────────────────
-RUN_TAG="lingbot_va_libero_long_libero_plus_libero10"
+RUN_TAG="lingbot_va_libero_long_sub_libero_plus_libero10"
 OUTPUT_DIR="${LINGBOT_VA_ROOT}/eval_results/${RUN_TAG}_$(date +%Y%m%d_%H%M%S)"
 mkdir -p "$OUTPUT_DIR"
 
 echo "========================================================"
-echo "LIBERO-Plus libero_10 eval (lingbot-va-posttrain-libero-long)"
+echo "Sub-LIBERO-Plus libero_10 eval (lingbot-va-posttrain-libero-long)"
 echo "  CKPT_DIR:   $CKPT_DIR"
 echo "  TASK_FILE:  $TASK_FILE"
 echo "  OUTPUT_DIR: $OUTPUT_DIR"
