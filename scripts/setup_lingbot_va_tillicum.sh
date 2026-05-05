@@ -96,6 +96,12 @@ pip install $PIP_NET_OPTS lerobot==0.3.3 scipy --no-deps
 # LIBERO-plus's setup.py installs robosuite/mujoco/etc. We don't `pip install
 # -e` the package because our slurm puts it on PYTHONPATH directly; we just
 # need its third-party requirements.
+#
+# robomimic pulls egl_probe which requires cmake to build. Tillicum's system
+# cmake isn't user-executable, so install a pip-managed cmake first.
+echo "[setup] installing pip-managed cmake (needed by egl_probe build)"
+pip install $PIP_NET_OPTS cmake
+
 if [[ -f "$LIBERO_PLUS_ROOT/requirements.txt" ]]; then
   echo "[setup] installing LIBERO-plus requirements"
   pip install $PIP_NET_OPTS -r "$LIBERO_PLUS_ROOT/requirements.txt" || {
