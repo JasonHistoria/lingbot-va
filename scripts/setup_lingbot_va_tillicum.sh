@@ -55,7 +55,7 @@ conda activate "$ENV_NAME"
 
 # GPFS + cluster network is flaky for large wheels — give pip generous
 # retry/timeout for every install below.
-PIP_NET_OPTS="--timeout 300 --retries 10"
+PIP_NET_OPTS="--timeout 300 --retries 10 --no-cache-dir"
 
 # ── 2. Install pinned deps from lingbot-va README ────────────────────────────
 echo "[setup] installing torch 2.9.0 + cu126"
